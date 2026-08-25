@@ -11,14 +11,12 @@ export const signup = async (req, res) => {
             });
         }
 
-        // Password minimum 8 characters
         if (password.length < 8) {
             return res.status(400).json({
                 message: "Password must be at least 8 characters"
             });
         }
 
-        // Optional maximum limit
         if (password.length > 64) {
             return res.status(400).json({
                 message: "Password must not exceed 64 characters"

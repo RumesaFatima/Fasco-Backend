@@ -12,10 +12,6 @@ export const login = async (req, res) => {
             });
         }
 
-        // =====================================================
-        // ADMIN LOGIN
-        // =====================================================
-
         const adminEmail = process.env.ADMIN_EMAIL;
         const adminPassword = process.env.ADMIN_PASSWORD;
 
@@ -47,10 +43,6 @@ export const login = async (req, res) => {
                 }
             });
         }
-
-        // =====================================================
-        // NORMAL USER LOGIN
-        // =====================================================
 
         const user = await User.findOne({ email });
 

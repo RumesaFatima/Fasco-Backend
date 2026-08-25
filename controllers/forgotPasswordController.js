@@ -34,7 +34,7 @@ export const forgotPassword = async (req, res) => {
         await user.save();
 
         const resetUrl =
-            `http://localhost:5173/reset-password/${resetToken}`;
+            `https://fasco-frontend-theta.vercel.app/reset-password/${resetToken}`;
 
         await sendEmail(
             user.email,
