@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
-
+import User from "../models/User.js";
+import Product from "../models/Product.js";
+import Order from "../models/Order.js";
 export const adminLogin = async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -77,6 +79,43 @@ export const getAdminProfile = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Server error",
+        });
+    }
+};
+export const getDashboardStats = async (req, res) => {
+    try {
+        const totalUsers = await User.countDocuments();
+        const totalProducts = await Product.countDocuments();
+        const totalOrders = await Order.countDocuments();
+
+        const orders = await Order.find();
+
+        const totalSales = orders.reduce(
+            (sum, order) => sum + (Number(order.total) || 0),
+            0
+        );
+
+        const pendingOrders = await Order.countDocuments({
+            status: "Processing"
+        });
+
+        return res.status(200).json({
+            success: true,
+            stats: {
+                totalUsers,
+                totalProducts,
+                totalOrders,
+                totalSales,
+                pendingOrders
+            }
+        });
+
+    } catch (error) {
+        console.error("Dashboard Stats Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Could not load dashboard data"
         });
     }
 };
