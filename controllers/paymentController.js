@@ -124,7 +124,7 @@ export const createCheckoutSession = async (req, res) => {
         total: String(calculatedTotal),
       },
 
-      success_url: "https://fasco-frontend-theta.vercel.app/payment-success",
+      success_url: "https://fasco-frontend-theta.vercel.app/payment-success?session_id={CHECKOUT_SESSION_ID}",
       cancel_url: "https://fasco-frontend-theta.vercel.app/payment-cancelled",
     });
 
