@@ -8,12 +8,18 @@ import orderRoutes from "./routes/orderRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
-
+import { handleStripeWebhook } from "./controllers/webhookController.js";
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
+app.post(
+  "/api/payments/webhook",
+  express.raw({ type: "application/json" }),
+  handleStripeWebhook
+);
 app.use(express.json());
 app.get("/", (_req, res) => res.json({ message: "Server is running" }));
 app.use("/api/auth", authRoutes);
@@ -22,6 +28,7 @@ app.use("/api/orders", orderRoutes);
 app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use(notFound);
 app.use(errorHandler);
 

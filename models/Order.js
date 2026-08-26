@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
+  stripeSessionId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
   user: { type: String, required: true },
   lines: [{
     productId: String,
