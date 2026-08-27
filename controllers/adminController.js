@@ -127,8 +127,11 @@ export const getDashboardStats = async (req, res) => {
             products,
         ] = await Promise.all([
             User.countDocuments(),
+
             Product.countDocuments(),
+
             Order.countDocuments(),
+
             Order.countDocuments({
                 status: {
                     $in: [
@@ -139,40 +142,106 @@ export const getDashboardStats = async (req, res) => {
                     ],
                 },
             }),
+
             Product.countDocuments({
                 stock: {
                     $gt: 0,
                     $lte: 10,
                 },
             }),
+
             Product.countDocuments({
                 stock: {
                     $lte: 0,
                 },
             }),
+
             Review.countDocuments(),
+
             Order.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .lean(),
+
             User.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .select("-password")
                 .lean(),
+
             Review.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .lean(),
+
             Product.find()
                 .sort({ createdAt: -1 })
                 .limit(50)
                 .lean(),
         ]);
 
+        // -----------------------------
+        // PAID ORDERS
+        // -----------------------------
+
         const allOrders = await Order.find().lean();
 
-        const totalSales = allOrders.reduce((total, order) => {
+        const paidOrders = allOrders.filter((order) => {
+            const paymentStatus = String(
+                order.paymentStatus ||
+                order.payment?.status ||
+                ""
+            ).toLowerCase();
+
+            return (
+                !paymentStatus ||
+                [
+                    "paid",
+                    "succeeded",
+                    "success",
+                ].includes(paymentStatus)
+            );
+        });
+
+        // -----------------------------
+        // TOTAL SALES
+        // -----------------------------
+
+        const totalSales = paidOrders.reduce(
+            (total, order) => {
+                const amount = Number(
+                    order.total ??
+                    order.totalAmount ??
+                    order.amount ??
+                    order.grandTotal ??
+                    0
+                );
+
+                return total + (
+                    Number.isFinite(amount)
+                        ? amount
+                        : 0
+                );
+            },
+            0
+        );
+
+        // -----------------------------
+        // REAL REVENUE BY MONTH
+        // -----------------------------
+
+        const revenueMap = {};
+
+        paidOrders.forEach((order) => {
+            const date = new Date(order.createdAt);
+
+            if (Number.isNaN(date.getTime())) return;
+
+            const year = date.getFullYear();
+            const month = date.getMonth();
+
+            const key = `${year}-${String(month + 1).padStart(2, "0")}`;
+
             const amount = Number(
                 order.total ??
                 order.totalAmount ??
@@ -181,32 +250,22 @@ export const getDashboardStats = async (req, res) => {
                 0
             );
 
-            const paymentStatus = String(
-                order.paymentStatus ||
-                order.payment?.status ||
-                ""
-            ).toLowerCase();
+            if (!Number.isFinite(amount)) return;
 
-            if (
-                paymentStatus &&
-                ![
-                    "paid",
-                    "succeeded",
-                    "success",
-                ].includes(paymentStatus)
-            ) {
-                return total;
-            }
+            revenueMap[key] =
+                (revenueMap[key] || 0) + amount;
+        });
 
-            return total + (
-                Number.isFinite(amount)
-                    ? amount
-                    : 0
-            );
-        }, 0);
+        const revenue = Object.entries(revenueMap)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, amount]) => ({
+                month,
+                amount,
+            }));
 
         return res.status(200).json({
             success: true,
+
             stats: {
                 totalUsers,
                 totalProducts,
@@ -217,13 +276,20 @@ export const getDashboardStats = async (req, res) => {
                 outOfStockProducts,
                 totalReviews,
             },
+
+            revenue,
+
             orders,
             customers,
             reviews,
             products,
         });
+
     } catch (error) {
-        console.error("Dashboard stats error:", error);
+        console.error(
+            "Dashboard stats error:",
+            error
+        );
 
         return res.status(500).json({
             success: false,

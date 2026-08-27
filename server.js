@@ -8,6 +8,7 @@ import orderRoutes from "./routes/orderRoutes.js";
 import newsletterRoutes from "./routes/newsletterRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
+import adminProductRoutes from "./routes/adminProductRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
@@ -44,7 +45,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/reviews", reviewRoutes);
-
+app.use("/api/admin/products", adminProductRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
