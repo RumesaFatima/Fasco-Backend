@@ -1,6 +1,8 @@
 import express from "express";
 
 import {
+    getProducts,
+    getProductById,
     createProduct,
     updateProduct,
     deleteProduct,
@@ -9,6 +11,18 @@ import {
 import { adminAuthMiddleware } from "../middleware/adminAuthMiddleware.js";
 
 const router = express.Router();
+
+router.get(
+    "/",
+    adminAuthMiddleware,
+    getProducts
+);
+
+router.get(
+    "/:id",
+    adminAuthMiddleware,
+    getProductById
+);
 
 router.post(
     "/",
