@@ -15,13 +15,31 @@ const orderSchema = new mongoose.Schema({
     color: String,
     size: String,
     qty: Number,
-
     price: Number
   }],
   subtotal: Number, discount: Number, shipping: Number, total: Number,
   address:
     { firstName: String, lastName: String, country: String, address: String, city: String, postal: String },
-  status: { type: String, default: "Processing" }
+  paymentStatus: {
+    type: String,
+    enum: ["Paid", "Unpaid", "Failed", "Refunded"],
+    default: "Unpaid",
+  },
+  deliveryStatus: {
+    type: String,
+    enum: [
+      "Pending",
+      "Processing",
+      "Shipped",
+      "Delivered",
+      "Cancelled",
+    ],
+    default: "Pending",
+  },
+  status: {
+    type: String,
+    default: "Processing",
+  },
 }, { timestamps: true });
 
 export default mongoose.model("Order", orderSchema);

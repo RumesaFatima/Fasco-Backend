@@ -9,6 +9,7 @@ import newsletterRoutes from "./routes/newsletterRoutes.js";
 import healthRoutes from "./routes/healthRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
 import { notFound, errorHandler } from "./middleware/errorMiddleware.js";
 import { handleStripeWebhook } from "./controllers/webhookController.js";
 const app = express();
@@ -29,6 +30,8 @@ app.use("/api/newsletter", newsletterRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payments", paymentRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/reviews", reviewRoutes);
 app.use(notFound);
 app.use(errorHandler);
 
