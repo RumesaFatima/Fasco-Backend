@@ -2,6 +2,84 @@ import User from "../models/User.js";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import Review from "../models/Review.js";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+
+export const adminLogin = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+
+        if (!email || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "Email and password are required",
+            });
+        }
+
+        const admin = await User.findOne({
+            email: email.toLowerCase().trim(),
+        }).select("+password");
+
+        if (!admin) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
+
+        const role = String(admin.role || "").toLowerCase();
+
+        if (role !== "admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Admin access required",
+            });
+        }
+
+        const isPasswordValid = await bcrypt.compare(
+            password,
+            admin.password
+        );
+
+        if (!isPasswordValid) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid email or password",
+            });
+        }
+
+        const token = jwt.sign(
+            {
+                id: admin._id,
+                email: admin.email,
+                role: "admin",
+            },
+            process.env.JWT_SECRET,
+            {
+                expiresIn: "7d",
+            }
+        );
+
+        return res.status(200).json({
+            success: true,
+            message: "Admin login successful",
+            token,
+            admin: {
+                id: admin._id,
+                name: admin.name || admin.username || "Admin",
+                email: admin.email,
+                role: admin.role,
+            },
+        });
+    } catch (error) {
+        console.error("Admin login error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Admin login failed",
+        });
+    }
+};
 
 export const getAdminProfile = async (req, res) => {
     try {
@@ -49,11 +127,8 @@ export const getDashboardStats = async (req, res) => {
             products,
         ] = await Promise.all([
             User.countDocuments(),
-
             Product.countDocuments(),
-
             Order.countDocuments(),
-
             Order.countDocuments({
                 status: {
                     $in: [
@@ -64,40 +139,34 @@ export const getDashboardStats = async (req, res) => {
                     ],
                 },
             }),
-
             Product.countDocuments({
                 stock: {
                     $gt: 0,
                     $lte: 10,
                 },
             }),
-
             Product.countDocuments({
                 stock: {
                     $lte: 0,
                 },
             }),
-
             Review.countDocuments(),
-
             Order.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .lean(),
-
             User.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .select("-password")
                 .lean(),
-
             Review.find()
                 .sort({ createdAt: -1 })
                 .limit(20)
                 .lean(),
-
             Product.find()
                 .sort({ createdAt: -1 })
+                .limit(50)
                 .lean(),
         ]);
 
@@ -124,20 +193,20 @@ export const getDashboardStats = async (req, res) => {
                     "paid",
                     "succeeded",
                     "success",
-                    "completed",
                 ].includes(paymentStatus)
             ) {
                 return total;
             }
 
             return total + (
-                Number.isFinite(amount) ? amount : 0
+                Number.isFinite(amount)
+                    ? amount
+                    : 0
             );
         }, 0);
 
         return res.status(200).json({
             success: true,
-
             stats: {
                 totalUsers,
                 totalProducts,
@@ -148,7 +217,6 @@ export const getDashboardStats = async (req, res) => {
                 outOfStockProducts,
                 totalReviews,
             },
-
             orders,
             customers,
             reviews,
