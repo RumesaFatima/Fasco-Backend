@@ -1,202 +1,139 @@
-import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import Product from "../models/Product.js";
 import Order from "../models/Order.js";
 import Review from "../models/Review.js";
-export const adminLogin = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "Email and password are required",
-            });
-        }
-
-        const adminEmail = process.env.ADMIN_EMAIL;
-        const adminPassword = process.env.ADMIN_PASSWORD;
-
-        if (!adminEmail || !adminPassword) {
-            return res.status(500).json({
-                success: false,
-                message: "Admin credentials are not configured",
-            });
-        }
-
-        if (
-            email.trim().toLowerCase() !== adminEmail.trim().toLowerCase() ||
-            password !== adminPassword
-        ) {
-            return res.status(401).json({
-                success: false,
-                message: "Invalid admin credentials",
-            });
-        }
-
-        const token = jwt.sign(
-            {
-                email: adminEmail,
-                role: "admin",
-            },
-            process.env.JWT_SECRET,
-            {
-                expiresIn: "1d",
-            }
-        );
-
-        return res.status(200).json({
-            success: true,
-            message: "Admin login successful",
-            token,
-            admin: {
-                email: adminEmail,
-                role: "admin",
-            },
-        });
-    } catch (error) {
-        console.error("Admin Login Error:", error);
-
-        return res.status(500).json({
-            success: false,
-            message: "Server error",
-        });
-    }
-};
-
 
 export const getAdminProfile = async (req, res) => {
     try {
+        const admin = req.admin || req.user;
+
+        if (!admin) {
+            return res.status(401).json({
+                success: false,
+                message: "Admin authentication required",
+            });
+        }
+
         return res.status(200).json({
             success: true,
             admin: {
-                email: req.admin.email,
-                role: req.admin.role,
+                id: admin._id,
+                name: admin.name || admin.username || "Admin",
+                email: admin.email,
+                role: admin.role || "admin",
             },
         });
     } catch (error) {
-        console.error("Admin Profile Error:", error);
+        console.error("Admin profile error:", error);
 
         return res.status(500).json({
             success: false,
-            message: "Server error",
+            message: "Failed to fetch admin profile",
         });
     }
 };
+
 export const getDashboardStats = async (req, res) => {
     try {
-        const totalUsers = await User.countDocuments();
+        const [
+            totalUsers,
+            totalProducts,
+            totalOrders,
+            pendingOrders,
+            lowStockProducts,
+            outOfStockProducts,
+            totalReviews,
+            orders,
+            customers,
+            reviews,
+            products,
+        ] = await Promise.all([
+            User.countDocuments(),
 
-        const totalProducts = await Product.countDocuments();
+            Product.countDocuments(),
 
-        const totalOrders = await Order.countDocuments();
+            Order.countDocuments(),
 
-        const orders = await Order.find()
-            .sort({ createdAt: -1 })
-            .lean();
+            Order.countDocuments({
+                status: {
+                    $in: [
+                        "Pending",
+                        "pending",
+                        "Processing",
+                        "processing",
+                    ],
+                },
+            }),
 
-        const paidOrders = orders.filter((order) => {
-            return (
-                order.paymentStatus === "Paid" ||
-                order.paymentStatus === "paid"
+            Product.countDocuments({
+                stock: {
+                    $gt: 0,
+                    $lte: 10,
+                },
+            }),
+
+            Product.countDocuments({
+                stock: {
+                    $lte: 0,
+                },
+            }),
+
+            Review.countDocuments(),
+
+            Order.find()
+                .sort({ createdAt: -1 })
+                .limit(20)
+                .lean(),
+
+            User.find()
+                .sort({ createdAt: -1 })
+                .limit(20)
+                .select("-password")
+                .lean(),
+
+            Review.find()
+                .sort({ createdAt: -1 })
+                .limit(20)
+                .lean(),
+
+            Product.find()
+                .sort({ createdAt: -1 })
+                .lean(),
+        ]);
+
+        const allOrders = await Order.find().lean();
+
+        const totalSales = allOrders.reduce((total, order) => {
+            const amount = Number(
+                order.total ??
+                order.totalAmount ??
+                order.amount ??
+                order.grandTotal ??
+                0
             );
-        });
 
-        const totalSales = paidOrders.reduce(
-            (sum, order) => {
-                return sum + (Number(order.total) || 0);
-            },
-            0
-        );
+            const paymentStatus = String(
+                order.paymentStatus ||
+                order.payment?.status ||
+                ""
+            ).toLowerCase();
 
-        const pendingOrders = orders.filter((order) => {
-            const status =
-                order.deliveryStatus ||
-                order.status ||
-                "Pending";
+            if (
+                paymentStatus &&
+                ![
+                    "paid",
+                    "succeeded",
+                    "success",
+                    "completed",
+                ].includes(paymentStatus)
+            ) {
+                return total;
+            }
 
-            return (
-                status === "Pending" ||
-                status === "Processing"
+            return total + (
+                Number.isFinite(amount) ? amount : 0
             );
-        }).length;
-
-        const lowStockProducts = await Product.countDocuments({
-            stock: {
-                $gt: 0,
-                $lte: 10,
-            },
-        });
-
-        const outOfStockProducts = await Product.countDocuments({
-            stock: {
-                $lte: 0,
-            },
-        });
-
-        const totalReviews = await Review.countDocuments();
-
-        const recentOrders = orders.slice(0, 10).map((order) => {
-            const customerName =
-                order.address?.firstName ||
-                order.user ||
-                "Customer";
-
-            const customerLastName =
-                order.address?.lastName || "";
-
-            const firstProduct =
-                order.lines?.[0] || {};
-
-            return {
-                id: order.id,
-
-                customer: `${customerName} ${customerLastName}`.trim(),
-
-                email: order.user,
-
-                product: firstProduct.name || "FASCO Product",
-
-                productImage: firstProduct.image || "",
-
-                date: order.createdAt,
-
-                amount: Number(order.total || 0),
-
-                paymentStatus:
-                    order.paymentStatus ||
-                    "Unpaid",
-
-                deliveryStatus:
-                    order.deliveryStatus ||
-                    order.status ||
-                    "Pending",
-
-                status:
-                    order.deliveryStatus ||
-                    order.status ||
-                    "Pending",
-            };
-        });
-
-        const products = await Product.find()
-            .sort({ createdAt: -1 })
-            .limit(20)
-            .lean();
-
-
-
-        const customers = await User.find()
-            .sort({ createdAt: -1 })
-            .limit(20)
-            .select("name email createdAt")
-            .lean();
-
-      
-        const reviews = await Review.find()
-            .sort({ createdAt: -1 })
-            .limit(20)
-            .lean();
+        }, 0);
 
         return res.status(200).json({
             success: true,
@@ -212,20 +149,17 @@ export const getDashboardStats = async (req, res) => {
                 totalReviews,
             },
 
-            orders: recentOrders,
-
-            products,
-
+            orders,
             customers,
-
             reviews,
+            products,
         });
     } catch (error) {
-        console.error("Dashboard Stats Error:", error);
+        console.error("Dashboard stats error:", error);
 
         return res.status(500).json({
             success: false,
-            message: "Could not load dashboard data",
+            message: "Failed to fetch dashboard data",
         });
     }
 };
