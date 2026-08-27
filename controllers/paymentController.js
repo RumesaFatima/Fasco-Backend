@@ -154,6 +154,32 @@ export const getCheckoutSession = async (req, res) => {
 
     const session = await stripe.checkout.sessions.retrieve(sessionId);
 
+    const metadata = session.metadata || {};
+
+    const items = JSON.parse(metadata.items || "[]");
+    const address = JSON.parse(metadata.address || "{}");
+
+    const Order = (await import("../models/Order.js")).default;
+
+    const existingOrder = await Order.findOne({
+      stripeSessionId: session.id,
+    });
+
+    if (!existingOrder && session.payment_status === "paid") {
+      await Order.create({
+        id: "FS-" + String(Math.floor(100000 + Math.random() * 900000)),
+        stripeSessionId: session.id,
+        user: session.customer_email,
+        lines: items,
+        subtotal: Number(metadata.subtotal || 0),
+        discount: Number(metadata.discount || 0),
+        shipping: Number(metadata.shipping || 0),
+        total: Number(metadata.total || 0),
+        address,
+        status: "Paid",
+      });
+    }
+
     return res.status(200).json({
       success: true,
       session: {
