@@ -1,5 +1,5 @@
-import stripe from "../services/stripeService.js";
 import Order from "../models/Order.js";
+import stripe from "../services/stripeService.js";
 
 export const handleStripeWebhook = async (req, res) => {
     const signature = req.headers["stripe-signature"];
@@ -20,7 +20,6 @@ export const handleStripeWebhook = async (req, res) => {
     try {
         if (event.type === "checkout.session.completed") {
             const session = event.data.object;
-
             const metadata = session.metadata || {};
 
             const items = JSON.parse(metadata.items || "[]");
@@ -31,7 +30,7 @@ export const handleStripeWebhook = async (req, res) => {
             });
 
             if (!existingOrder) {
-                const order = await Order.create({
+                await Order.create({
                     id: "FS-" + String(Math.floor(100000 + Math.random() * 900000)),
                     stripeSessionId: session.id,
                     user: session.customer_email,
@@ -44,7 +43,7 @@ export const handleStripeWebhook = async (req, res) => {
                     status: "Paid",
                 });
 
-                console.log("ORDER SAVED:", order.id);
+                console.log("Order created:", session.id);
             }
         }
 
