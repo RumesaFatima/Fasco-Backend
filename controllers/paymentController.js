@@ -111,6 +111,7 @@ export const createCheckoutSession = async (req, res) => {
             name: item.name,
             qty: item.quantity,
             price: Number(item.price),
+            image: item.image || "",
           }))
         ),
 
